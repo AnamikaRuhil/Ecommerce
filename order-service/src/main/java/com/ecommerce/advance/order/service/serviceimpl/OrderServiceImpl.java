@@ -13,6 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.Instant;
@@ -27,22 +29,23 @@ public class OrderServiceImpl implements OrderService {
     private final WebClient webClient = WebClient.create();
 
     @Value("${cart.service.url}")
-    private final String cartUrl;
+    private String cartUrl;
 
     @Autowired
-    public OrderServiceImpl(OrderRepository orderRepository, OrderEventProducer eventProducer, String cartUrl) {
+    public OrderServiceImpl(OrderRepository orderRepository, OrderEventProducer eventProducer) {
         this.orderRepository = orderRepository;
         this.eventProducer = eventProducer;
-        this.cartUrl = cartUrl;
     }
 
     @Override
     public OrderResponseDto createOrderFromCart(String userId) {
         log.info("Create order from cart : userId={}", userId);
+        String authHeader = getAuthorizationHeader();
         CartDto cart;
         try {
              cart = webClient.get()
                     .uri(cartUrl + "/{userId}", userId)
+                     .header("Authorization", authHeader)
                     .retrieve()
                     .bodyToMono(CartDto.class)
                     .block();
@@ -124,5 +127,14 @@ public class OrderServiceImpl implements OrderService {
                 .createdAt(order.getCreatedAt())
                 .message(message)
                 .build();
+    }
+    private String getAuthorizationHeader() {
+        ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+
+        if (attrs != null) {
+            return attrs.getRequest().getHeader("Authorization");
+        }
+        return null;
     }
 }

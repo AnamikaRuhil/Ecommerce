@@ -17,14 +17,14 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@RequestBody AuthRequest request) {
-        String token = authService.register(request.getUsername(), request.getPassword());
-        return ResponseEntity.ok(new AuthResponse("Bearer " + token));
+        return ResponseEntity.ok(authService.register(request));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody AuthRequest request) {
-        String token = authService.login(request.getUsername(), request.getPassword());
-        return ResponseEntity.ok(new AuthResponse("Bearer " + token));
+        AuthResponse response = authService.login(request.getUsername(), request.getPassword());
+
+        return ResponseEntity.ok(response);
     }
 }
 

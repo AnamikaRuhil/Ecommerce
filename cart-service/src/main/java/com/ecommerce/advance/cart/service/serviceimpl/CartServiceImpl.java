@@ -8,11 +8,12 @@ import com.ecommerce.advance.cart.repository.CartRepository;
 import com.ecommerce.advance.cart.requestdto.CartRequestDto;
 import com.ecommerce.advance.cart.responsedto.CartResponseDto;
 import com.ecommerce.advance.cart.service.CartService;
-import jakarta.ws.rs.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.util.ArrayList;
@@ -25,22 +26,23 @@ public class CartServiceImpl implements CartService {
     private final WebClient webClient = WebClient.create();
 
     @Value("${product.service.url}")
-    private final String productUrl;
+    private String productUrl;
 
     @Autowired
-    public CartServiceImpl(CartRepository cartRepository, CartEventProducer eventProducer, String productUrl) {
+    public CartServiceImpl(CartRepository cartRepository, CartEventProducer eventProducer) {
         this.cartRepository = cartRepository;
         this.eventProducer = eventProducer;
-        this.productUrl = productUrl;
     }
 
     public CartResponseDto addToCart(String userId, CartRequestDto requestDto) {
 
         log.info("Add to cart :: userId={}, productId={}, qty={}",
                 userId, requestDto.getProductId(), requestDto.getQuantity());
+        String authHeader = getAuthorizationHeader();
         try {
             var productResponse = webClient.get()
                     .uri(productUrl + "/{id}", requestDto.getProductId())
+                    .header("Authorization", authHeader)
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
@@ -101,5 +103,15 @@ public class CartServiceImpl implements CartService {
 
         return "Checkout started for user " + userId;
 
+    }
+
+    private String getAuthorizationHeader() {
+        ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+
+        if (attrs != null) {
+            return attrs.getRequest().getHeader("Authorization");
+        }
+        return null;
     }
 }

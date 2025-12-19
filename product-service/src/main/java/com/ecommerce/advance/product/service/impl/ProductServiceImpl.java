@@ -9,11 +9,13 @@ import com.ecommerce.advance.product.responsedto.ProductPriceResponse;
 import com.ecommerce.advance.product.responsedto.ProductResponseDto;
 import com.ecommerce.advance.product.service.ProductService;
 import jakarta.transaction.Transactional;
-import jakarta.ws.rs.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.errors.ResourceNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
@@ -27,16 +29,14 @@ public class ProductServiceImpl implements ProductService {
 
 
     @Value("${product.service.detail-url}")
-    private final String detailServiceUrl;
+    private String detailServiceUrl;
 
     @Value("${product.service.price-url}")
-    private final String priceServiceUrl;
+    private String priceServiceUrl;
 
     @Autowired
-    public ProductServiceImpl(ProductRepository repository, String detailServiceUrl, String priceServiceUrl) {
+    public ProductServiceImpl(ProductRepository repository) {
         this.repository = repository;
-        this.detailServiceUrl = detailServiceUrl;
-        this.priceServiceUrl = priceServiceUrl;
     }
 
     @Override
@@ -130,10 +130,12 @@ public class ProductServiceImpl implements ProductService {
 
     private ProductPriceResponse fetchPrice(Long productId) {
         log.info("Fetching Price for productId={}", productId);
+        String authHeader = getAuthorizationHeader();
 
         try {
             ProductPriceResponse response = webClient.get()
                     .uri(priceServiceUrl + "/{productId}", productId)
+                    .header("Authorization", authHeader)
                     .retrieve()
                     .bodyToMono(ProductPriceResponse.class)
                     .block();
@@ -143,15 +145,17 @@ public class ProductServiceImpl implements ProductService {
 
         } catch (Exception ex) {
             log.error("Failed to fetch price details for productId={}", productId, ex);
-            throw new BadRequestException("Unable to fetch product details");
+            throw new ResourceNotFoundException("Unable to fetch product details");
         }
     }
 
     private ProductDetailResponse fetchDetail(Long productId) {
         log.info("Calling Product-Detail service for productId={}", productId);
+        String authHeader = getAuthorizationHeader();
         try {
             ProductDetailResponse response = webClient.get()
                     .uri(detailServiceUrl + "/get/{pid}", productId)
+                    .header("Authorization", authHeader)
                     .retrieve()
                     .bodyToMono(ProductDetailResponse.class)
                     .block();
@@ -161,7 +165,7 @@ public class ProductServiceImpl implements ProductService {
 
         } catch (Exception ex) {
             log.error("Failed to fetch product details for productId={}", productId, ex);
-            throw new BadRequestException("Unable to fetch product details");
+            throw new DataNotFoundException("Unable to fetch product details");
         }
     }
 
@@ -184,5 +188,15 @@ public class ProductServiceImpl implements ProductService {
                 .orElseThrow(() -> new DataNotFoundException("Product not found with ID: " + id));
         repository.deleteById(id);
 
+    }
+
+    private String getAuthorizationHeader() {
+        ServletRequestAttributes attrs =
+                (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+
+        if (attrs != null) {
+            return attrs.getRequest().getHeader("Authorization");
+        }
+        return null;
     }
 }

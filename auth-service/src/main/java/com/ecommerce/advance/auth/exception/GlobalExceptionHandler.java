@@ -1,8 +1,6 @@
 package com.ecommerce.advance.auth.exception;
 
-import com.ecommerce.advance.auth.exception.ErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -22,14 +20,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(buildError("BAD_REQUEST", ex.getMessage()));
-    }
-
-
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex) {
-        log.error("Bad Request, while calling another service", ex);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(buildError(ex.getMessage(), "BAD_REQUEST"));
     }
 
     @ExceptionHandler(DataNotFoundException.class)

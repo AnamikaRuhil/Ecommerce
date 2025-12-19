@@ -1,7 +1,6 @@
 package com.ecommerce.advance.price.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -40,14 +39,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(buildError("VALIDATION_ERROR", "Invalid request"));
-    }
-
-
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex) {
-        log.error("Bad Request, while calling another service", ex);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(buildError(ex.getMessage(), "BAD_REQUEST"));
     }
 
     @ExceptionHandler(DataNotFoundException.class)

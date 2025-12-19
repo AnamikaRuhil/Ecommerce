@@ -1,7 +1,6 @@
 package com.ecommerce.advance.cart.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.ws.rs.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
@@ -15,17 +14,6 @@ import java.time.LocalDateTime;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Object> handleBadRequest(IllegalArgumentException ex, HttpServletRequest request) {
-        log.error("Bad Request exception", ex);
-
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST)
-                .body(buildError("BAD_REQUEST", ex.getMessage()));
-
-    }
-
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntime(RuntimeException ex) {
         log.error("Runtime exception", ex);
@@ -40,14 +28,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
                 .body(buildError("VALIDATION_ERROR", "Invalid request"));
-    }
-
-
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex) {
-        log.error("Bad Request, while calling another service", ex);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(buildError(ex.getMessage(), "BAD_REQUEST"));
     }
 
     @ExceptionHandler(DataNotFoundException.class)

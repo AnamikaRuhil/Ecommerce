@@ -1,6 +1,8 @@
 package com.ecommerce.advance.auth.service;
 
 
+import com.ecommerce.advance.auth.dto.AuthRequest;
+import com.ecommerce.advance.auth.dto.AuthResponse;
 import com.ecommerce.advance.auth.exception.DataNotFoundException;
 import com.ecommerce.advance.auth.model.UserEntity;
 import com.ecommerce.advance.auth.repository.UserRepository;
@@ -19,22 +21,30 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
 
-    public String register(String username, String password) {
-        if (userRepository.findByUsername(username).isPresent()) {
+    public AuthResponse register(AuthRequest request) {
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
             throw new RuntimeException("User already exists");
         }
 
         UserEntity user = UserEntity.builder()
-                .username(username)
-                .password(passwordEncoder.encode(password))
-                .role("ROLE_USER")
+                .username(request.getUsername())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .role(request.getRole())
                 .build();
 
+        String token =  jwtUtil.generateToken(user.getUsername(), user.getRole());
+
         userRepository.save(user);
-        return jwtUtil.generateToken(username, user.getRole());
+        return AuthResponse.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .role(user.getRole())
+                .token(token)
+                .message("User registered successfully")
+                .build();
     }
 
-    public String login(String username, String password) {
+    public AuthResponse login(String username, String password) {
         log.info("Login for user :{}",username);
         UserEntity user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new DataNotFoundException("User does not exist"));
@@ -43,6 +53,14 @@ public class AuthService {
             throw new RuntimeException("Invalid credentials");
         }
 
-        return jwtUtil.generateToken(username, user.getRole());
+        String token = jwtUtil.generateToken(username, user.getRole());
+        return AuthResponse.builder()
+                .userId(user.getId())
+                .username(user.getUsername())
+                .role(user.getRole())
+                .token(token)
+                .message("User Login successfully")
+                .build();
+
     }
 }
