@@ -1,6 +1,7 @@
 package com.ecommerce.advance.auth.service;
 
 
+import com.ecommerce.advance.auth.exception.DataNotFoundException;
 import com.ecommerce.advance.auth.model.UserEntity;
 import com.ecommerce.advance.auth.repository.UserRepository;
 import com.ecommerce.advance.auth.security.JwtUtil;
@@ -34,8 +35,9 @@ public class AuthService {
     }
 
     public String login(String username, String password) {
+        log.info("Login for user :{}",username);
         UserEntity user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("Invalid credentials"));
+                .orElseThrow(() -> new DataNotFoundException("User does not exist"));
 
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new RuntimeException("Invalid credentials");

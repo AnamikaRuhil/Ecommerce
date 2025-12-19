@@ -1,5 +1,6 @@
 package com.ecommerce.advance.product.service.impl;
 
+import com.ecommerce.advance.product.exception.DataNotFoundException;
 import com.ecommerce.advance.product.model.ProductEntity;
 import com.ecommerce.advance.product.repo.ProductRepository;
 import com.ecommerce.advance.product.requestdto.ProductRequestDto;
@@ -8,44 +9,42 @@ import com.ecommerce.advance.product.responsedto.ProductPriceResponse;
 import com.ecommerce.advance.product.responsedto.ProductResponseDto;
 import com.ecommerce.advance.product.service.ProductService;
 import jakarta.transaction.Transactional;
+import jakarta.ws.rs.BadRequestException;
 import lombok.extern.slf4j.Slf4j;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Service
 @Slf4j
 public class ProductServiceImpl implements ProductService {
-
-    public static final Logger logger = LoggerFactory.getLogger(ProductServiceImpl.class);
-
     private final ProductRepository repository;
     private final WebClient webClient = WebClient.create();
 
 
     @Value("${product.service.detail-url}")
-    private String detailServiceUrl;
+    private final String detailServiceUrl;
 
     @Value("${product.service.price-url}")
-    private String priceServiceUrl;
+    private final String priceServiceUrl;
 
     @Autowired
-    public ProductServiceImpl(ProductRepository repository) {
+    public ProductServiceImpl(ProductRepository repository, String detailServiceUrl, String priceServiceUrl) {
         this.repository = repository;
+        this.detailServiceUrl = detailServiceUrl;
+        this.priceServiceUrl = priceServiceUrl;
     }
 
     @Override
     @Transactional
     public ProductResponseDto create(ProductRequestDto requestDto) {
-        logger.info("Inside product create service");
+        log.info("Creating product | productName={}, category={}",
+                requestDto.getName(), requestDto.getCategory());
+
         ProductEntity entity = ProductEntity.builder()
                 .name(requestDto.getName())
                 .stock(requestDto.getStock())
@@ -56,44 +55,67 @@ public class ProductServiceImpl implements ProductService {
                 .build();
         entity.setDeleted(false);
 
-        entity = repository.save(entity);
+        ProductEntity savedEntity = repository.save(entity);
+        log.info("Product created | productId={} ,productName={},",
+                savedEntity.getId(), savedEntity.getName());
 
-        return mapToResponse(entity);
+        return mapToResponse(savedEntity);
 
     }
 
     @Transactional
     public void softDelete(Long id) {
+        log.info("Soft deleting product | product id = {}", id);
         ProductEntity product = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found: " + id));
+                .orElseThrow(() -> new DataNotFoundException("Product not found: " + id));
+
         product.setDeleted(true);
         product.setUpdatedAt(LocalDateTime.now());
         repository.save(product);
+        log.info("Product soft deleted | product id = {}", id);
     }
 
     @Transactional
     public void restore(Long id) {
+        log.info("Restoring product | product id = {}", id);
         ProductEntity product = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found: " + id));
+                .orElseThrow(() -> new DataNotFoundException("Product not found: " + id));
         product.setDeleted(false);
         product.setUpdatedAt(LocalDateTime.now());
         repository.save(product);
+        log.info("Product Restored| product id = {}", id);
     }
 
     @Transactional
     public void hardDelete(Long id) {
+        log.info("Hard deleting product id={}", id);
+        if (!repository.existsById(id)) {
+            throw new DataNotFoundException("Product not found: " + id);
+        }
         repository.deleteById(id);
+        log.info("Product deleted permanently | product id={}", id);
     }
 
 
     public List<ProductResponseDto> getAll() {
+        log.info("Fetching all products");
         List<ProductEntity> products = repository.findAll();
+        if (products.isEmpty()) {
+            log.warn("No product details available");
+            throw new DataNotFoundException("No product details found");
+        }
         return products.stream().map(this::mapToResponseWithDetails).toList();
     }
 
-    public ProductResponseDto getById(Long id) {
-        ProductEntity product = repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found: " + id));
+    public ProductResponseDto getById(Long productId) {
+        log.info("Fetching product by product Id={}", productId);
+
+        ProductEntity product = repository.findById(productId)
+                .orElseThrow(() -> {
+                    log.warn("Product not found | productId={}", productId);
+                    return new DataNotFoundException(
+                            "Product not found for Id = " + productId);
+                });
         return mapToResponseWithDetails(product);
     }
 
@@ -107,39 +129,39 @@ public class ProductServiceImpl implements ProductService {
     }
 
     private ProductPriceResponse fetchPrice(Long productId) {
+        log.info("Fetching Price for productId={}", productId);
+
         try {
-            return webClient.get()
+            ProductPriceResponse response = webClient.get()
                     .uri(priceServiceUrl + "/{productId}", productId)
                     .retrieve()
                     .bodyToMono(ProductPriceResponse.class)
-                    .onErrorResume(ex -> Mono.just(
-                            ProductPriceResponse.builder()
-                                    .error("Price not available")
-                                    .build()
-                    ))
                     .block();
-        } catch (Exception e) {
-           return ProductPriceResponse.builder()
-                   .error("Failed to fetch price: " + e.getMessage())
-                   .build();
+            log.info("Received Price response for productId={}", productId);
+
+            return response;
+
+        } catch (Exception ex) {
+            log.error("Failed to fetch price details for productId={}", productId, ex);
+            throw new BadRequestException("Unable to fetch product details");
         }
     }
 
     private ProductDetailResponse fetchDetail(Long productId) {
+        log.info("Calling Product-Detail service for productId={}", productId);
         try {
-            return webClient.get()
+            ProductDetailResponse response = webClient.get()
                     .uri(detailServiceUrl + "/get/{pid}", productId)
                     .retrieve()
                     .bodyToMono(ProductDetailResponse.class)
-                    .onErrorResume(ex -> Mono.just(
-                                    ProductDetailResponse.builder()
-                                            .attributes(Map.of("error", "Details not available"))
-                                            .build()))
                     .block();
-        } catch (Exception e) {
-            return ProductDetailResponse.builder()
-                    .attributes(Map.of("error", "Failed to fetch Details    Q2"))
-                    .build();
+
+            log.info("Received Product-Detail response for productId={}", productId);
+            return response;
+
+        } catch (Exception ex) {
+            log.error("Failed to fetch product details for productId={}", productId, ex);
+            throw new BadRequestException("Unable to fetch product details");
         }
     }
 
@@ -157,8 +179,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public void deleteById(Long id) {
+        log.info("Inside product delete,delete product for id {}", id);
         repository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Product not found with ID: " + id));
+                .orElseThrow(() -> new DataNotFoundException("Product not found with ID: " + id));
         repository.deleteById(id);
 
     }

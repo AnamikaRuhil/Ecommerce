@@ -15,4 +15,6 @@ public interface ProductDetailRepository extends MongoRepository<ProductDetailEn
     void deleteByProductId(Long pid);
 
     List<ProductDetailEntity> findByCategory(String category);
+
+    boolean existsByProductId(Long productId);
 }

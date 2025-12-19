@@ -1,5 +1,7 @@
 package com.ecommerce.advance.order.service.serviceimpl;
 
+import com.ecommerce.advance.order.exception.BusinessException;
+import com.ecommerce.advance.order.exception.DataNotFoundException;
 import com.ecommerce.advance.order.kafka.OrderEventProducer;
 import com.ecommerce.advance.order.model.OrderEntity;
 import com.ecommerce.advance.order.repository.OrderRepository;
@@ -9,6 +11,7 @@ import com.ecommerce.advance.order.responsedto.OrderResponseDto;
 import com.ecommerce.advance.order.service.OrderService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -23,25 +26,35 @@ public class OrderServiceImpl implements OrderService {
     private final OrderEventProducer eventProducer;
     private final WebClient webClient = WebClient.create();
 
-    private final String CART_URL = "http://localhost:8084/cart/";
+    @Value("${cart.service.url}")
+    private final String cartUrl;
 
     @Autowired
-    public OrderServiceImpl(OrderRepository orderRepository, OrderEventProducer eventProducer) {
+    public OrderServiceImpl(OrderRepository orderRepository, OrderEventProducer eventProducer, String cartUrl) {
         this.orderRepository = orderRepository;
         this.eventProducer = eventProducer;
+        this.cartUrl = cartUrl;
     }
 
     @Override
     public OrderResponseDto createOrderFromCart(String userId) {
-
-        CartDto cart = webClient.get()
-                .uri(CART_URL + userId)
-                .retrieve()
-                .bodyToMono(CartDto.class)
-                .block();
+        log.info("Create order from cart : userId={}", userId);
+        CartDto cart;
+        try {
+             cart = webClient.get()
+                    .uri(cartUrl + "/{userId}", userId)
+                    .retrieve()
+                    .bodyToMono(CartDto.class)
+                    .block();
+        }
+        catch (Exception ex) {
+            log.error("Failed to fetch cart for userId={}", userId, ex);
+            throw new BusinessException("Unable to fetch cart for order creation");
+        }
 
         if (cart == null || cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new RuntimeException("Cart empty or not found.");
+            log.warn("Order creation failed – cart empty for userId={}", userId);
+            throw new BusinessException("Cart is empty or not found");
         }
 
         OrderEntity order = OrderEntity.builder()
@@ -56,29 +69,42 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         OrderEntity saved = orderRepository.save(order);
+        log.info("Order saved | orderId={}, userId={}, amount={}",
+                saved.getId(), userId, saved.getTotalAmount());
 
         eventProducer.publishOrderCreated(saved.getId(), userId, saved.getTotalAmount());
 
+        log.info("OrderCreated event published | orderId={}", saved.getId());
         return mapToDto(saved, "Order created successfully");
     }
 
     @Override
     public List<OrderResponseDto> getOrdersByUser(String userId) {
-        return orderRepository.findByUserId(userId)
-                .stream()
+        log.info("Fetching orders for user {}", userId);
+        List<OrderEntity> orders = orderRepository.findByUserId(userId);
+        if (orders.isEmpty()) {
+            log.warn("No orders found for user {}", userId);
+            throw new DataNotFoundException("No orders found for user");
+        }
+        return orders.stream()
                 .map(this::mapToDto)
                 .toList();
     }
 
     @Override
     public List<OrderResponseDto> getAllOrders() {
-        return orderRepository.findAll()
-                .stream()
+        log.info("Fetching all orders");
+        List<OrderEntity> orders = orderRepository.findAll();
+
+        if (orders.isEmpty()) {
+            log.warn("No orders found");
+            throw new DataNotFoundException("No orders available");
+        }
+        return orders.stream()
                 .map(this::mapToDto)
                 .toList();
     }
 
-    // ------------- MAPPING LOGIC -------------------
 
     private OrderResponseDto mapToDto(OrderEntity order) {
         return mapToDto(order, null);

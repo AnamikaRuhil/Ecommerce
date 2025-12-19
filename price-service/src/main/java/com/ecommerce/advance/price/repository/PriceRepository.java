@@ -12,4 +12,6 @@ public interface PriceRepository extends JpaRepository<PriceEntity,Long> {
     Optional<PriceEntity> findByProductId(Long pid);
 
     void deleteByProductId(Long pid);
+
+    boolean existsByProductId(Long productId);
 }
