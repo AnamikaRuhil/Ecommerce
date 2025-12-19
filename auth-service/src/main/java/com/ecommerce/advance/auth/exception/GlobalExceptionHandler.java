@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DataNotFoundException.class)
     public ResponseEntity<Object> handleDataNotFound(DataNotFoundException ex, HttpServletRequest request) {
         log.error("Data not found", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(buildError(ex.getMessage(), "DATA_NOT_FOUND"));
     }
 

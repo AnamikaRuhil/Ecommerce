@@ -22,8 +22,6 @@ public class OrderEventListener {
     @KafkaListener(topics = "order-events", groupId = "notification-group")
     public void listen(OrderEvent event) {
 
-        System.out.println("[Notification-Service] Received event: " + event);
-
         String msg = switch (event.getEventType()) {
             case "ORDER_CREATED" -> "Your order has been placed successfully!";
             case "ORDER_FAILED" -> "Your order could not be processed.";
@@ -38,6 +36,5 @@ public class OrderEventListener {
 
         notificationService.saveNotification(notification);
 
-        System.out.println("[Notification-Service] Notification saved for " + event.getUserId());
     }
 }

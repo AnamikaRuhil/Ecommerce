@@ -12,8 +12,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class ProductEvent {
         private Long productId;
-        private String eventType; // PRODUCT_DELETED, PRODUCT_DELETE_FAILED, PRODUCT_PURGE_READY
-        private String source;    // e.g., product-service
+        private String eventType;
+        private String source;
         private String message;
     }
 

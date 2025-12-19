@@ -26,17 +26,13 @@ public class KafkaConsumerConfig {
         props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
         props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, ErrorHandlingDeserializer.class);
 
-        // Tell the ErrorHandlingDeserializer to use the StringDeserializer for keys
         props.put(ErrorHandlingDeserializer.KEY_DESERIALIZER_CLASS,
                 StringDeserializer.class.getName());
 
-        // Tell the ErrorHandlingDeserializer to use JsonDeserializer for values
         props.put(ErrorHandlingDeserializer.VALUE_DESERIALIZER_CLASS,
                 JsonDeserializer.class.getName());
 
-        // Configure the JsonDeserializer via properties:
         props.put(JsonDeserializer.TRUSTED_PACKAGES, "*");
-        // Optional: set default target type (helps if type information headers are not used)
         props.put(JsonDeserializer.VALUE_DEFAULT_TYPE,
                 "com.ecommerce.advance.common.events.ProductEvent");
 

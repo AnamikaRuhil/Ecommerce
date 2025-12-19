@@ -13,6 +13,5 @@ public class CartEventProducer {
     public void sendCheckoutEvent(String userId, double amount) {
         String message = "CHECKOUT_STARTED for user: " + userId + " amount: " + amount;
         kafkaTemplate.send("cart-events", message);
-        System.out.println("EVENT SENT: " + message);
     }
 }
